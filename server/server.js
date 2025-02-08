@@ -64,7 +64,7 @@ Key information about OneSingleView:
 - Key Value Proposition: Unified view of sales data across all locations and POS systems
 
 Provide helpful information about OneSingleView's POS integration services and direct users to human agents for detailed implementation discussions, pricing, or technical queries.
-Give short and concise responses.
+Give very short and concise responses.
 `;
 
 const chatModel = new ChatOpenAI({
@@ -110,7 +110,6 @@ async function correctSpelling(message) {
     }
 }
 
-// Make shouldTransferToAgent async
 async function shouldTransferToAgent(message) {
     try {
         // First correct any spelling mistakes
@@ -212,109 +211,116 @@ wss.on('connection', (ws) => {
                 break;
             
 
-            case 'chat':
-                let chat = await Chat.findOne({ 
-                    userId: data.userId, 
-                    status: { $in: ['waiting', 'waiting_for_agent', 'active', 'bot'] }
-                });
-
-                if (!chat) {
-                    chat = new Chat({
-                        userId: data.userId,
-                        messages: [{ role: 'user', message: data.message }],
-                        status: 'bot',
-                        startedAt: new Date()
+                case 'chat':
+                    let chat = await Chat.findOne({ 
+                        userId: data.userId, 
+                        status: { $in: ['waiting', 'waiting_for_agent', 'active', 'bot'] }
                     });
-                    await chat.save();
-                } else {
-                    chat.messages.push({ role: 'user', message: data.message });
-                    await chat.save();
-                }
                 
-                const errorCodeMatch = data.message.match(/(?:error|code|error code)\s*:?\s*(\d{4})/i);
-                if (errorCodeMatch) {
-                    const errorResponse = await errorHandler.getErrorResponse(errorCodeMatch[1]);
-                    
-                    chat.messages.push({ role: 'bot', message: errorResponse });
-                    await chat.save();
-        
-                    ws.send(JSON.stringify({
-                        type: 'bot_response',
-                        message: errorResponse
-                    }));
-                    return;
-                }
-
-                const errorResponse = processMessage(data.message);
-                if (errorResponse) {
-                    chat.messages.push({ role: 'bot', message: errorResponse });
-                    await chat.save();
-                
-                    ws.send(JSON.stringify({
-                        type: 'bot_response',
-                        message: errorResponse
-                    }));
-                    return;
-                }
-            
-                if (await shouldTransferToAgent(data.message)) {
-                    await Chat.findOneAndUpdate(
-                        { userId: data.userId },
-                        { $set: { status: 'waiting_for_agent' } }
-                    );
-            
-                    agents.forEach((agentWs) => {
-                        agentWs.send(JSON.stringify({
-                            type: 'user_request',
+                    if (!chat) {
+                        chat = new Chat({
                             userId: data.userId,
-                            history: chat.messages
-                        }));
-                    });
-            
-                    ws.send(JSON.stringify({
-                        type: 'bot_response',
-                        message: "I'll connect you with a specialist who can answer your queries. Please wait a moment."
-                    }));
-                }
-                else if (chat.status === 'waiting_for_agent') {
-                    ws.send(JSON.stringify({
-                        type: 'bot_response',
-                        message: "A OneSingleView specialist will be with you shortly. Thank you for your patience."
-                    }));
-                } else if (chat.status === 'bot') {
-                    try {
-                        const response = await chain.call({ input: data.message });
-
-                        chat.messages.push({ role: 'bot', message: response.response });
+                            messages: [{ role: 'user', message: data.message }],
+                            status: 'bot',
+                            startedAt: new Date()
+                        });
                         await chat.save();
-
+                    } else {
+                        chat.messages.push({ role: 'user', message: data.message });
+                        await chat.save();
+                    }
+                    
+                    // Handle error codes first
+                    const errorCodeMatch = data.message.match(/(?:error|code|error code)\s*:?\s*(\d{4})/i);
+                    if (errorCodeMatch) {
+                        const errorResponse = await errorHandler.getErrorResponse(errorCodeMatch[1]);
+                        
+                        chat.messages.push({ role: 'bot', message: errorResponse });
+                        await chat.save();
+                
                         ws.send(JSON.stringify({
                             type: 'bot_response',
-                            message: response.response
+                            message: errorResponse
                         }));
-                    } catch (error) {
-                        console.error('Error in chat response:', error);
-                        await Chat.findOneAndUpdate(
-                            { userId: data.userId },
-                            { $set: { status: 'waiting_for_agent' } }
-                        );
-
+                        return;
+                    }
+                
+                    const errorResponse = processMessage(data.message);
+                    if (errorResponse) {
+                        chat.messages.push({ role: 'bot', message: errorResponse });
+                        await chat.save();
+                    
                         ws.send(JSON.stringify({
                             type: 'bot_response',
-                            message: "I apologize, but I'm having trouble processing your request. Let me connect you with a human specialist who can help."
+                            message: errorResponse
+                        }));
+                        return;
+                    }
+                
+                    // Only check for transfer to agent if in bot mode
+                    if (chat.status === 'bot') {
+                        if (await shouldTransferToAgent(data.message)) {
+                            await Chat.findOneAndUpdate(
+                                { userId: data.userId },
+                                { $set: { status: 'waiting_for_agent' } }
+                            );
+                    
+                            agents.forEach((agentWs) => {
+                                agentWs.send(JSON.stringify({
+                                    type: 'user_request',
+                                    userId: data.userId,
+                                    history: chat.messages
+                                }));
+                            });
+                    
+                            ws.send(JSON.stringify({
+                                type: 'bot_response',
+                                message: "I'll connect you with a specialist who can answer your queries. Please wait a moment."
+                            }));
+                        } else {
+                            try {
+                                const response = await chain.call({ input: data.message });
+                
+                                chat.messages.push({ role: 'bot', message: response.response });
+                                await chat.save();
+                
+                                ws.send(JSON.stringify({
+                                    type: 'bot_response',
+                                    message: response.response
+                                }));
+                            } catch (error) {
+                                console.error('Error in chat response:', error);
+                                await Chat.findOneAndUpdate(
+                                    { userId: data.userId },
+                                    { $set: { status: 'waiting_for_agent' } }
+                                );
+                
+                                ws.send(JSON.stringify({
+                                    type: 'bot_response',
+                                    message: "I apologize, but I'm having trouble processing your request. Let me connect you with a human specialist who can help."
+                                }));
+                            }
+                        }
+                    }
+                    // Handle waiting for agent status
+                    else if (chat.status === 'waiting_for_agent') {
+                        ws.send(JSON.stringify({
+                            type: 'bot_response',
+                            message: "A OneSingleView specialist will be with you shortly. Thank you for your patience."
                         }));
                     }
-                } else if (chat.status === 'active') {
-                    const agentWs = agents.get(chat.agentId);
-                    if (agentWs) {
-                        agentWs.send(JSON.stringify({
-                            type: 'chat',
-                            userId: data.userId,
-                            message: data.message
-                        }));
+                    // Handle active chat with agent
+                    else if (chat.status === 'active') {
+                        const agentWs = agents.get(chat.agentId);
+                        if (agentWs) {
+                            agentWs.send(JSON.stringify({
+                                type: 'chat',
+                                userId: data.userId,
+                                message: data.message  // Original message without correction
+                            }));
+                        }
                     }
-                }
-                break;
+                    break;
 
             case 'agent_message':
                 const userWs = clients.get(data.userId);

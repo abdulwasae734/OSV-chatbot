@@ -63,7 +63,10 @@ class ErrorHandler {
             Please provide a human-friendly response that:
             1. Clearly explains the issue in simple terms
             2. Provides specific next steps or solutions (dont outright suggest to contact the human customer support)
-            3. Maintains a professional tone
+            3. Maintains a professional tone.
+            4. Dont be overly sympathetic.
+            5. No need to start with sentences like "Hello! I'm sorry to hear about your transaction issue." You can directly jump to the reasoning part.
+            
             
             Keep the response very concise and helpful.`;
 
