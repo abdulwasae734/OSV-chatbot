@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat Support</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <style>
+        .messages-container {
+            height: calc(100vh - 280px);
+            min-height: 400px;
+        }
+        
+        .message {
+            max-width: 85%;
+            animation: fadeIn 0.3s ease-in;
+            word-wrap: break-word;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 3px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #666;
+        }
+
+        /* Markdown Styles */
+        .message code {
+            background-color: #f3f4f6;
+            padding: 0.125rem 0.375rem;
+            border-radius: 0.25rem;
+            font-size: 0.875rem;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+
+        .message pre {
+            background-color: #f3f4f6;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            margin: 0.5rem 0;
+            overflow-x: auto;
+        }
+
+        .message pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+
+        .message h1, .message h2, .message h3 {
+            font-weight: 600;
+            margin: 0.75rem 0;
+        }
+
+        .message h1 {
+            font-size: 1.25rem;
+        }
+
+        .message h2 {
+            font-size: 1.125rem;
+        }
+
+        .message h3 {
+            font-size: 1rem;
+        }
+
+        .message ul, .message ol {
+            padding-left: 1.25rem;
+            margin: 0.5rem 0;
+        }
+
+        .message ul {
+            list-style-type: disc;
+        }
+
+        .message ol {
+            list-style-type: decimal;
+        }
+
+        .message p {
+            margin: 0.5rem 0;
+        }
+
+        .message strong {
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div class="bg-white rounded-xl shadow-lg w-full max-w-2xl">
+            <!-- Header -->
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h1 class="text-xl font-semibold text-gray-800">Chat Support</h1>
+            </div>
+
+            <!-- Chat Area -->
+            <div class="messages-container custom-scrollbar overflow-y-auto p-6" id="messages">
+                <!-- Messages will be inserted here -->
+            </div>
+
+            <!-- Input Area -->
+            <div class="border-t border-gray-200 p-4 space-y-4">
+                <div class="flex space-x-3">
+                    <input type="text" 
+                           id="userInput" 
+                           class="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="Type your message...">
+                    <button onclick="sendMessage()" 
+                            class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                        Send
+                    </button>
+                </div>
+
+                <button id="connectAgentBtn" 
+                        onclick="connectToAgent()"
+                        class="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100">
+                    Not satisfied with the answer? Connect with an agent!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        let userId = localStorage.getItem('userId');
+        const ws = new WebSocket(`ws://localhost:3000`);
+        let waitingForAgent = false;
+        
+        function restoreMessages(messages) {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML = ''; 
+
+            messages.forEach(msg => {
+                let className = '';
+                switch(msg.role) {
+                    case 'user': className = 'user-message'; break;
+                    case 'bot': className = 'bot-message'; break;
+                    case 'agent': className = 'agent-message'; break;
+                }
+                appendMessage(msg.message, className);
+            });
+        }
+
+        function fetchChatHistory(userId) {
+            fetch(`http://localhost:3000/chat-history/${userId}`)
+                .then(response => response.json())
+                .then(messages => {
+                    if (messages && messages.length > 0) {
+                        restoreMessages(messages);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching chat history:', error);
+                });
+        }
+
+        ws.onopen = () => {
+            if (!userId) {
+                ws.send(JSON.stringify({
+                    type: 'register',
+                    role: 'user'
+                }));
+            } else {
+                ws.send(JSON.stringify({
+                    type: 'register',
+                    role: 'user',
+                    userId: userId
+                }));
+            }
+        };
+        
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            let messageClass = '';
+
+            if (data.type === 'register_response') {
+                userId = data.userId;
+                localStorage.setItem('userId', userId);
+                fetchChatHistory(userId);
+            }
+            
+            switch(data.type) {
+                case 'bot_response':
+                    messageClass = 'bot-message';
+                    break;
+                case 'agent_message':
+                    messageClass = 'agent-message';
+                    document.getElementById('connectAgentBtn').disabled = true;
+                    break;
+                case 'agent_connected':
+                    messageClass = 'agent-message';
+                    waitingForAgent = false;
+                    document.getElementById('connectAgentBtn').disabled = true;
+                    break;
+                case 'chat_ended':
+                    messageClass = 'bot-message';
+                    document.getElementById('userInput').disabled = true;
+                    document.querySelector('button').disabled = true;
+                    document.getElementById('connectAgentBtn').disabled = true;
+                    break;
+            }
+            
+            if (data.message) {
+                appendMessage(data.message, messageClass);
+            }
+        };
+        
+        function appendMessage(message, className) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            
+            const isUser = className === 'user-message';
+            const isAgent = className === 'agent-message';
+            
+            messageDiv.className = `message ${isUser ? 'ml-auto' : 'mr-auto'} mb-4 p-3 rounded-lg ${
+                isUser ? 'bg-blue-500 text-white' : 
+                isAgent ? 'bg-orange-50 border border-orange-100' :
+                'bg-gray-100'
+            }`;
+            
+            messageDiv.innerHTML = marked.parse(message);
+            
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        function sendMessage() {
+            const input = document.getElementById('userInput');
+            const message = input.value.trim();
+            
+            if (message) {
+                appendMessage(message, 'user-message');
+                ws.send(JSON.stringify({
+                    type: 'chat',
+                    userId: userId,
+                    message: message
+                }));
+                input.value = '';
+            }
+        }
+        
+        function connectToAgent() {
+            if (!waitingForAgent) {
+                waitingForAgent = true;
+                ws.send(JSON.stringify({
+                    type: 'chat',
+                    userId: userId,
+                    message: 'connect me to an agent'
+                }));
+                document.getElementById('connectAgentBtn').disabled = true;
+                document.getElementById('connectAgentBtn').textContent = 'Connecting to an agent...';
+            }
+        }
+        
+        document.getElementById('userInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        ws.onerror = (error) => {
+            console.error('WebSocket Error:', error);
+            appendMessage('Connection error. Please try again later.', 'bot-message');
+        };
+    </script>
+</body>
+</html>
