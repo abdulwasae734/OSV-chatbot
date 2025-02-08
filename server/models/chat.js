@@ -17,7 +17,6 @@ const ChatSchema = new mongoose.Schema({
     endedAt: { type: Date }
 }, { autoIndex: false });
 
-// Remove any existing unique index on userId
 ChatSchema.index({ userId: 1 }, { unique: false });
 
 module.exports = mongoose.model('Chat', ChatSchema);

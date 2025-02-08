@@ -34,17 +34,15 @@ app.get('/agent', (req, res) => {
 });
 
 
-app.use(cors()); // Add this before your routes
-
+app.use(cors()); 
 app.get('/chat-history/:userId', async (req, res) => {
     try {
         const activeChat = await Chat.findOne({ 
             userId: req.params.userId,
-            status: { $in: ['waiting', 'waiting_for_agent', 'active', 'bot'] }  // Only get active chats
-        }).sort({ startedAt: -1 }); // Get the most recent chat
+            status: { $in: ['waiting', 'waiting_for_agent', 'active', 'bot'] } 
+        }).sort({ startedAt: -1 }); 
         
         if (!activeChat) {
-            // If no active chat exists, return empty array
             return res.json([]);
         }
         
@@ -56,14 +54,15 @@ app.get('/chat-history/:userId', async (req, res) => {
 });
 
 const systemMessage = `
-You are a customer service representative for OneSingleView, a specialized software solution provider for retail and restaurant businesses.
+You are a customer service representative chatbot for OneSingleView, a specialized software solution provider for retail and restaurant businesses.
 
 Key information about OneSingleView:
 - Primary Focus: POS (Point of Sale) data integration and management
 - Target Customers: Retail stores and restaurants with multiple locations or POS systems
 - Key Value Proposition: Unified view of sales data across all locations and POS systems
 
-Provide helpful information about OneSingleView's POS integration services and direct users to human agents for detailed implementation discussions, pricing, or technical queries.
+Provide helpful information about OneSingleView's POS integration services. Try solving their problems first and if that doesnt work then direct users to human agents for detailed implementation discussions, pricing, or technical queries.
+Ask for error codes if they have a problem regarding transactions.
 Give very short and concise responses.
 `;
 
@@ -106,18 +105,16 @@ async function correctSpelling(message) {
         return completion.content || message;
     } catch (error) {
         console.error('Spelling correction error:', error);
-        return message; // Return original message if correction fails
+        return message;
     }
 }
 
 async function shouldTransferToAgent(message) {
     try {
-        // First correct any spelling mistakes
         const correctedMessage = await correctSpelling(message);
         console.log('Original message:', message);
         console.log('Corrected message:', correctedMessage);
         
-        // Convert message to lowercase for easier matching
         const userMessage = correctedMessage.toLowerCase();
         
         const agentWords = ['agent', 'human', 'person', 'someone', 'staff', 'support', 'representative', 'rep', 'management', 'manager'];
@@ -144,7 +141,6 @@ async function shouldTransferToAgent(message) {
         return wantsAgent || directRequest || hasBusinessTerm || isFrustrated;
     } catch (error) {
         console.error('Error in shouldTransferToAgent:', error);
-        // If there's an error, return false to ensure the chat continues
         return false;
     }
 }
@@ -230,7 +226,6 @@ wss.on('connection', (ws) => {
                         await chat.save();
                     }
                     
-                    // Handle error codes first
                     const errorCodeMatch = data.message.match(/(?:error|code|error code)\s*:?\s*(\d{4})/i);
                     if (errorCodeMatch) {
                         const errorResponse = await errorHandler.getErrorResponse(errorCodeMatch[1]);
@@ -257,7 +252,6 @@ wss.on('connection', (ws) => {
                         return;
                     }
                 
-                    // Only check for transfer to agent if in bot mode
                     if (chat.status === 'bot') {
                         if (await shouldTransferToAgent(data.message)) {
                             await Chat.findOneAndUpdate(
@@ -302,21 +296,19 @@ wss.on('connection', (ws) => {
                             }
                         }
                     }
-                    // Handle waiting for agent status
                     else if (chat.status === 'waiting_for_agent') {
                         ws.send(JSON.stringify({
                             type: 'bot_response',
                             message: "A OneSingleView specialist will be with you shortly. Thank you for your patience."
                         }));
                     }
-                    // Handle active chat with agent
                     else if (chat.status === 'active') {
                         const agentWs = agents.get(chat.agentId);
                         if (agentWs) {
                             agentWs.send(JSON.stringify({
                                 type: 'chat',
                                 userId: data.userId,
-                                message: data.message  // Original message without correction
+                                message: data.message 
                             }));
                         }
                     }
@@ -360,7 +352,6 @@ wss.on('connection', (ws) => {
 
             case 'end_chat':
                 try {
-                // Delete the chat from MongoDB
                 await Chat.deleteOne({ 
                     userId: data.userId, 
                     status: { $ne: 'ended' } 

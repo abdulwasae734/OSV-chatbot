@@ -79,7 +79,6 @@ class ErrorHandler {
 
         } catch (error) {
             console.error('Error generating AI response:', error);
-            // Fallback to a basic response if AI fails
             return `I understand you're experiencing Error ${errorCode}. This is happening because ${errorInfo.reason}. Please try again or contact our support team for assistance.`;
         }
     }

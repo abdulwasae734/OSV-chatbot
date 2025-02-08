@@ -40,7 +40,6 @@
 </head>
 <body class="bg-gray-50">
     <div class="min-h-screen">
-        <!-- Header -->
         <header class="bg-white shadow-sm">
             <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
                 <h1 class="text-2xl font-semibold text-gray-900">Agent Dashboard</h1>
@@ -49,19 +48,19 @@
 
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <!-- Pending Requests Section -->
+                <!-- pending Reqs here -->
                 <div class="lg:col-span-1">
                     <div class="bg-white rounded-lg shadow">
                         <div class="p-4 border-b border-gray-200">
                             <h2 class="text-lg font-medium text-gray-900">Pending Requests</h2>
                         </div>
                         <div id="requests" class="p-4 space-y-4 custom-scrollbar overflow-y-auto" style="max-height: calc(100vh - 200px);">
-                            <!-- Requests will be inserted here -->
+                            <!-- reqs insertion -->
                         </div>
                     </div>
                 </div>
 
-                <!-- Chat Window Section -->
+                <!-- chat window-->
                 <div class="lg:col-span-2">
                     <div id="chatWindow" class="hidden bg-white rounded-lg shadow h-full">
                         <div class="p-4 border-b border-gray-200 flex justify-between items-center">
@@ -72,7 +71,7 @@
                         </div>
                         
                         <div id="messages" class="messages-container p-4 space-y-4 overflow-y-auto custom-scrollbar bg-gray-50">
-                            <!-- Messages will be inserted here -->
+                            <!-- msgs insertion here -->
                         </div>
 
                         <div class="p-4 border-t border-gray-200">
