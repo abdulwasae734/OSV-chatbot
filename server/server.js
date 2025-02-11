@@ -61,7 +61,7 @@ Key information about OneSingleView:
 - Target Customers: Retail stores and restaurants with multiple locations or POS systems
 - Key Value Proposition: Unified view of sales data across all locations and POS systems
 
-Provide helpful information about OneSingleView's POS integration services. Try solving their problems first and if that doesnt work then direct users to human agents for detailed implementation discussions, pricing, or technical queries.
+Provide helpful information about OneSingleView's POS integration services. Try solving their problems first and if that doesnt work then direct users to human agents for detailed implementation discussions.
 Ask for error codes if they have a problem regarding transactions.
 Give very short and concise responses.
 `;
@@ -226,8 +226,7 @@ wss.on('connection', (ws) => {
                         await chat.save();
                     }
                     
-                    const errorCodeMatch = data.message.match(/(?:error|code|error code)\s*:?\s*(\d{4})/i);
-                    if (errorCodeMatch) {
+                    const errorCodeMatch = data.message.match(/(?:error|code).+?(\d{4})/i);                    if (errorCodeMatch) {
                         const errorResponse = await errorHandler.getErrorResponse(errorCodeMatch[1]);
                         
                         chat.messages.push({ role: 'bot', message: errorResponse });
