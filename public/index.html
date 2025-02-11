@@ -96,6 +96,40 @@
         .message strong {
             font-weight: 600;
         }
+
+               /* Typing indicator */
+               .typing-indicator {
+            display: flex;
+            gap: 2px;
+        }
+
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            background: #90cdf4;
+            border-radius: 50%;
+            animation: typingWave 1.4s linear infinite;
+            opacity: 0.3;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typingWave {
+            0%, 60%, 100% {
+                transform: translateY(0);
+                opacity: 0.3;
+            }
+            30% {
+                transform: translateY(-4px);
+                opacity: 1;
+            }
+        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -123,7 +157,7 @@
                 <button id="connectAgentBtn" 
                         onclick="connectToAgent()"
                         class="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100">
-                    Not satisfied with the answer? Connect with an agent!
+                    Connect with an agent
                 </button>
             </div>
         </div>
@@ -163,6 +197,31 @@
                 });
         }
 
+        function showTypingIndicator() {
+            removeTypingIndicator(); // Remove existing indicator if any
+            const messagesDiv = document.getElementById('messages');
+            const typingDiv = document.createElement('div');
+            typingDiv.id = 'typingIndicator';
+            typingDiv.className = 'message mr-auto mb-4 p-3 rounded-lg bg-orange-50 border border-orange-100';
+            typingDiv.innerHTML = `
+                <div class="typing-indicator">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            `;
+            messagesDiv.appendChild(typingDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function removeTypingIndicator() {
+            const typingIndicator = document.getElementById('typingIndicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
+
+
         ws.onopen = () => {
             if (!userId) {
                 ws.send(JSON.stringify({
@@ -193,19 +252,39 @@
                     messageClass = 'bot-message';
                     break;
                 case 'agent_message':
+                    removeTypingIndicator();
                     messageClass = 'agent-message';
                     document.getElementById('connectAgentBtn').disabled = true;
                     break;
+
                 case 'agent_connected':
                     messageClass = 'agent-message';
                     waitingForAgent = false;
-                    document.getElementById('connectAgentBtn').disabled = true;
+                    const connectBtn = document.getElementById('connectAgentBtn');
+                    connectBtn.disabled = true;
+                    connectBtn.classList.remove('bg-gray-100', 'hover:bg-gray-200', 'text-gray-700');
+                    connectBtn.classList.add('bg-green-100', 'text-green-800');
+                    connectBtn.textContent = 'Connected to agent';
                     break;
+
+                case 'agent_typing':
+                    if (!document.getElementById('typingIndicator')) {
+                        showTypingIndicator();
+                    }
+                    return; // Don't proceed to message append
+                case 'stop_typing':
+                    removeTypingIndicator();
+                    return; // Don't proceed to message append
                 case 'chat_ended':
+                    removeTypingIndicator();
                     messageClass = 'bot-message';
                     document.getElementById('userInput').disabled = true;
                     document.querySelector('button').disabled = true;
-                    document.getElementById('connectAgentBtn').disabled = true;
+                    const disconnectBtn = document.getElementById('connectAgentBtn');
+                    disconnectBtn.disabled = true;
+                    disconnectBtn.classList.remove('bg-green-100', 'text-green-800', 'bg-gray-100', 'hover:bg-gray-200', 'text-gray-700');
+                    disconnectBtn.classList.add('bg-red-50', 'text-red-700');
+                    disconnectBtn.textContent = 'Disconnected from Agent.';
                     break;
             }
             
@@ -261,6 +340,48 @@
             }
         }
         
+        // Add this after the existing userInput event listener in your index.html
+        let typingTimer;
+        const doneTypingInterval = 1000; // Time in ms
+            
+        let isTyping = false;
+        document.getElementById('userInput').addEventListener('keyup', function() {
+            clearTimeout(typingTimer);
+            
+            // Only send events if we're in an agent chat
+            if (!document.getElementById('connectAgentBtn').disabled) return;
+            
+            // Don't send typing indicator if the input is empty
+            if (this.value.length === 0) {
+                if (isTyping) {
+                    isTyping = false;
+                    ws.send(JSON.stringify({
+                        type: 'stop_typing',
+                        userId: userId
+                    }));
+                }
+                return;
+            }
+        
+            // Only send typing event if we weren't already typing
+            if (!isTyping) {
+                isTyping = true;
+                ws.send(JSON.stringify({
+                    type: 'user_typing',
+                    userId: userId
+                }));
+            }
+        
+            // Start timer to detect when user stops typing
+            typingTimer = setTimeout(() => {
+                isTyping = false;
+                ws.send(JSON.stringify({
+                    type: 'stop_typing',
+                    userId: userId
+                }));
+            }, doneTypingInterval);
+        });
+
         document.getElementById('userInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') sendMessage();
         });

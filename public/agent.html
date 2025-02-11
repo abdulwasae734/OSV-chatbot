@@ -36,6 +36,40 @@
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
             background: #666;
         }
+
+        /* Typing indicator */
+        .typing-indicator {
+            display: flex;
+            gap: 2px;
+        }
+
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            background: #90cdf4;
+            border-radius: 50%;
+            animation: typingWave 1.4s linear infinite;
+            opacity: 0.3;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typingWave {
+            0%, 60%, 100% {
+                transform: translateY(0);
+                opacity: 0.3;
+            }
+            30% {
+                transform: translateY(-4px);
+                opacity: 1;
+            }
+        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -48,7 +82,7 @@
 
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <!-- pending Reqs here -->
+                <!-- Pending Requests here -->
                 <div class="lg:col-span-1">
                     <div class="bg-white rounded-lg shadow">
                         <div class="p-4 border-b border-gray-200">
@@ -95,6 +129,7 @@
         let activeUserId = null;
         let agentId = null;
         const ws = new WebSocket(`ws://localhost:3000`);
+        let typingTimer = null;
 
         ws.onopen = () => {
             ws.send(JSON.stringify({
@@ -161,11 +196,49 @@
                     
                 case 'chat':
                     if (activeUserId === data.userId) {
+                        removeTypingIndicator();
                         appendMessage(data.message, 'user-message');
                     }
                     break;
+                
+                case 'user_typing':
+                    if (activeUserId === data.userId && !document.getElementById('typingIndicator')) {
+                        showTypingIndicator();
+                    }
+                    break;
+                
+                case 'stop_typing':
+                    if (activeUserId === data.userId) {
+                        removeTypingIndicator();
+                    }
+                    break;
             }
+
         };
+
+        function showTypingIndicator() {
+            removeTypingIndicator(); // Remove existing indicator if any
+            const messagesDiv = document.getElementById('messages');
+            const typingDiv = document.createElement('div');
+            typingDiv.id = 'typingIndicator';
+            typingDiv.className = 'message mr-auto mb-4 p-3 rounded-lg bg-gray-100';
+            typingDiv.innerHTML = `
+                <div class="typing-indicator">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            `;
+            messagesDiv.appendChild(typingDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function removeTypingIndicator() {
+            const typingIndicator = document.getElementById('typingIndicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
 
         function removeRequest(userId) {
             const requestDiv = document.getElementById(`request-${userId}`);
@@ -184,11 +257,8 @@
             document.getElementById('chatWindow').style.display = 'block';
             document.getElementById('messages').innerHTML = '';
             
-            document.querySelectorAll('.request-item button').forEach(button => {
-                button.disabled = true;
-                button.className = 'w-full mt-3 px-4 py-2 bg-gray-300 text-gray-500 rounded cursor-not-allowed';
-                button.textContent = 'Currently Busy';
-            });
+            // Update all request buttons
+            updateRequestButtons();
             
             ws.send(JSON.stringify({
                 type: 'remove_request',
@@ -202,6 +272,20 @@
             }));
         }
         
+        function updateRequestButtons() {
+            document.querySelectorAll('#requests button').forEach(button => {
+                if (activeUserId) {
+                    button.disabled = true;
+                    button.className = 'w-full mt-3 px-4 py-2 bg-gray-300 text-gray-500 rounded cursor-not-allowed';
+                    button.textContent = 'Currently Busy';
+                } else {
+                    button.disabled = false;
+                    button.className = 'w-full mt-3 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors';
+                    button.textContent = 'Accept Chat';
+                }
+            });
+        }
+        
         function endChat() {
             if (activeUserId) {
                 ws.send(JSON.stringify({
@@ -213,14 +297,10 @@
                 document.getElementById('messages').innerHTML = '';
                 
                 removeRequest(activeUserId);
-                
-                document.querySelectorAll('.request-item button').forEach(button => {
-                    button.disabled = false;
-                    button.className = 'w-full mt-3 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors';
-                    button.textContent = 'Accept Chat';
-                });
-                
                 activeUserId = null;
+                
+                // Update request buttons after ending chat
+                updateRequestButtons();
             }
         }
         
@@ -229,7 +309,7 @@
             const messageDiv = document.createElement('div');
             
             const isUser = type === 'user-message';
-            messageDiv.className = `message ${isUser ? 'ml-auto' : 'mr-auto'} p-3 rounded-lg ${
+            messageDiv.className = `message ${isUser ? 'mr-auto' : 'ml-auto'} p-3 rounded-lg ${
                 isUser ? 'bg-blue-500 text-white' : 'bg-white border border-gray-200'
             }`;
             
@@ -255,6 +335,38 @@
         
         document.getElementById('agentInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') sendMessage();
+        });
+
+        let agentTypingTimer;
+        const agentDoneTypingInterval = 1000; // Time in ms
+
+        document.getElementById('agentInput').addEventListener('keyup', function() {
+            if (!activeUserId) return;
+
+            clearTimeout(agentTypingTimer);
+
+            // Don't send typing indicator if the input is empty
+            if (this.value.length === 0) {
+                ws.send(JSON.stringify({
+                    type: 'agent_stop_typing',
+                    userId: activeUserId
+                }));
+                return;
+            }
+        
+            // Send typing indicator
+            ws.send(JSON.stringify({
+                type: 'agent_typing',
+                userId: activeUserId
+            }));
+        
+            // Start timer to detect when agent stops typing
+            agentTypingTimer = setTimeout(() => {
+                ws.send(JSON.stringify({
+                    type: 'agent_stop_typing',
+                    userId: activeUserId
+                }));
+            }, agentDoneTypingInterval);
         });
     </script>
 </body>

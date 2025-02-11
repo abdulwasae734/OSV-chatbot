@@ -146,7 +146,7 @@ async function shouldTransferToAgent(message) {
 }
 
 function processMessage(message) {
-    const errorCodeMatch = message.match(/(?:error|code|error code)\s*:?\s*(\d{4})/i);
+    const errorCodeMatch = message.match(/(\d{4})/);
     if (errorCodeMatch) {
         return errorHandler.getErrorResponse(errorCodeMatch[1]);
     }
@@ -176,12 +176,12 @@ async function getNextAgentId() {
     );
     return `agent_${counter.lastAgentId}`;
 }
-
 wss.on('connection', (ws) => {
     ws.on('message', async (message) => {
         const data = JSON.parse(message);
         
         switch(data.type) {
+
             case 'register':
                 if (data.role === 'user') {
                     const userId = data.userId || await getNextUserId();
@@ -226,7 +226,8 @@ wss.on('connection', (ws) => {
                         await chat.save();
                     }
                     
-                    const errorCodeMatch = data.message.match(/(?:error|code).+?(\d{4})/i);                    if (errorCodeMatch) {
+                    const errorCodeMatch = data.message.match(/(\d{4})/);
+                    if (errorCodeMatch) {
                         const errorResponse = await errorHandler.getErrorResponse(errorCodeMatch[1]);
                         
                         chat.messages.push({ role: 'bot', message: errorResponse });
@@ -349,6 +350,80 @@ wss.on('connection', (ws) => {
                 }
                 break;
 
+
+
+            // Add this to your existing WebSocket message handler switch statement inside wss.on('connection', (ws))
+            case 'user_typing':
+                if (data.userId) {
+                    const activeChat = await Chat.findOne({ 
+                        userId: data.userId,
+                        status: 'active'
+                    });
+                    
+                    if (activeChat && activeChat.agentId) {
+                        const agentWs = agents.get(activeChat.agentId);
+                        if (agentWs) {
+                            agentWs.send(JSON.stringify({
+                                type: 'user_typing',
+                                userId: data.userId
+                            }));
+                            
+                            // Start a timer to automatically remove typing indicator if no stop_typing event is received
+                            setTimeout(() => {
+                                agentWs.send(JSON.stringify({
+                                    type: 'stop_typing',
+                                    userId: data.userId
+                                }));
+                            }, 3000);
+                        }
+                    }
+                }
+                break;
+            
+            case 'stop_typing':
+                if (data.userId) {
+                    const activeChat = await Chat.findOne({ 
+                        userId: data.userId,
+                        status: 'active'
+                    });
+                    
+                    if (activeChat && activeChat.agentId) {
+                        const agentWs = agents.get(activeChat.agentId);
+                        if (agentWs) {
+                            agentWs.send(JSON.stringify({
+                                type: 'stop_typing',
+                                userId: data.userId
+                            }));
+                        }
+                    }
+                }
+                break;
+
+                
+            // Add these cases to your existing WebSocket message handler switch statement
+            case 'agent_typing':
+                if (data.userId) {
+                    const userWs = clients.get(data.userId);
+                    if (userWs) {
+                        userWs.send(JSON.stringify({
+                            type: 'agent_typing'
+                        }));
+                    }
+                }
+                break;
+            
+            case 'agent_stop_typing':
+                if (data.userId) {
+                    const userWs = clients.get(data.userId);
+                    if (userWs) {
+                        userWs.send(JSON.stringify({
+                            type: 'stop_typing'
+                        }));
+                    }
+                }
+                break;
+            
+            
             case 'end_chat':
                 try {
                 await Chat.deleteOne({ 
