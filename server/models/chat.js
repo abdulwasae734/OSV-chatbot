@@ -9,7 +9,7 @@ const ChatSchema = new mongoose.Schema({
     }],
     status: { 
         type: String, 
-        enum: ['waiting', 'waiting_for_agent', 'active', 'ended', 'bot'], 
+        enum: ['waiting', 'waiting_for_agent', 'active', 'ended', 'bot', 'paused'], 
         default: 'waiting' 
     },
     agentId: { type: String },

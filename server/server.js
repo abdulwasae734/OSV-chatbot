@@ -13,6 +13,7 @@ const cors = require('cors');
 const UserCounter = require('./models/userCounter');
 const AgentCounter = require('./models/agentCounter');
 const errorHandler = require('./errorHandler');
+global.isArabic = false;
 
 
 errorHandler.initialize().catch(console.error);
@@ -60,6 +61,8 @@ Key information about OneSingleView:
 - Primary Focus: POS (Point of Sale) data integration and management
 - Target Customers: Retail stores and restaurants with multiple locations or POS systems
 - Key Value Proposition: Unified view of sales data across all locations and POS systems
+
+- Respond in the language in which the user queries.
 
 Provide helpful information about OneSingleView's POS integration services. Try solving their problems first and if that doesnt work then direct users to human agents for detailed implementation discussions.
 Ask for error codes if they have a problem regarding transactions.
@@ -117,26 +120,48 @@ async function shouldTransferToAgent(message) {
         
         const userMessage = correctedMessage.toLowerCase();
         
+        // English terms
         const agentWords = ['agent', 'human', 'person', 'someone', 'staff', 'support', 'representative', 'rep', 'management', 'manager'];
         const connectWords = ['connect', 'speak', 'talk', 'chat', 'help', 'transfer', 'switch'];
         const frustrationWords = ['confused', 'stuck', 'dont understand', "don't understand", 'not helping', 'not working', 'useless', 'waste', 'frustrated', 'annoying', 'unclear'];
-        
         const businessTerms = ['pricing', 'quote', 'cost', 'payment', 'integration', 'setup', 'implementation', 
-                              'compatible', 'demo', 'trial', 'support plan', 'technical', 'api', 'custom', 
-                              'report', 'contract', 'account', 'subscription', 'billing'];
+                             'compatible', 'demo', 'trial', 'support plan', 'technical', 'api', 'custom', 
+                             'report', 'contract', 'account', 'subscription', 'billing'];
 
-        const wantsAgent = agentWords.some(word => userMessage.includes(word)) &&
-                          connectWords.some(word => userMessage.includes(word));
+        // Arabic terms
+        const arabicAgentWords = ['وكيل', 'موظف', 'شخص', 'أحد', 'طاقم', 'دعم', 'ممثل', 'مندوب', 'إدارة', 'مدير'];
+        const arabicConnectWords = ['تواصل', 'تحدث', 'كلم', 'محادثة', 'مساعدة', 'تحويل', 'تبديل'];
+        const arabicFrustrationWords = ['محتار', 'عالق', 'لا أفهم', 'مش فاهم', 'مو مساعد', 'مو شغال', 'عديم الفائدة', 'مضيعة', 'محبط', 'مزعج', 'غير واضح'];
+        const arabicBusinessTerms = ['تسعير', 'عرض سعر', 'تكلفة', 'دفع', 'تكامل', 'إعداد', 'تنفيذ',
+                                   'متوافق', 'تجربة', 'نسخة تجريبية', 'خطة الدعم', 'تقني', 'واجهة برمجة', 'مخصص',
+                                   'تقرير', 'عقد', 'حساب', 'اشتراك', 'فواتير'];
 
+        // Combining English and Arabic terms
+        const allAgentWords = [...agentWords, ...arabicAgentWords];
+        const allConnectWords = [...connectWords, ...arabicConnectWords];
+        const allFrustrationWords = [...frustrationWords, ...arabicFrustrationWords];
+        const allBusinessTerms = [...businessTerms, ...arabicBusinessTerms];
+
+        const wantsAgent = allAgentWords.some(word => userMessage.includes(word)) &&
+                          allConnectWords.some(word => userMessage.includes(word));
+
+        // Direct request patterns for both languages
         const directRequest = userMessage.includes('live chat') || 
-                             userMessage.includes('real person') ||
-                             userMessage.match(/can i speak to/i) ||
-                             userMessage.match(/need to speak/i) ||
-                             userMessage.match(/want to speak/i) ||
-                             userMessage.match(/talk to your/i);
+                            userMessage.includes('real person') ||
+                            userMessage.includes('محادثة مباشرة') ||
+                            userMessage.includes('شخص حقيقي') ||
+                            userMessage.match(/can i speak to/i) ||
+                            userMessage.match(/need to speak/i) ||
+                            userMessage.match(/want to speak/i) ||
+                            userMessage.match(/talk to your/i) ||
+                            userMessage.match(/ممكن أتحدث/i) ||
+                            userMessage.match(/أحتاج التحدث/i) ||
+                            userMessage.match(/أريد التحدث/i) ||
+                            userMessage.match(/التحدث مع/i);
 
-        const hasBusinessTerm = businessTerms.some(term => userMessage.includes(term));
-        const isFrustrated = frustrationWords.some(word => userMessage.includes(word));
+        const hasBusinessTerm = allBusinessTerms.some(term => userMessage.includes(term));
+        const isFrustrated = allFrustrationWords.some(word => userMessage.includes(word));
+
 
         return wantsAgent || directRequest || hasBusinessTerm || isFrustrated;
     } catch (error) {
@@ -151,6 +176,16 @@ function processMessage(message) {
         return errorHandler.getErrorResponse(errorCodeMatch[1]);
     }
     return null;
+}
+
+function isArabicContent(text) {
+    // Arabic Unicode ranges
+    const arabicLetters = /[\u0600-\u06FF\u0750-\u077F]/;  // Basic Arabic letters
+    const arabicNumbers = /[\u0660-\u0669]/;               // Arabic-Indic digits (٠-٩)
+    
+    // Return true if the text contains either Arabic letters or numbers
+    global.isArabic = arabicLetters.test(text) || arabicNumbers.test(text);
+    return global.isArabic;
 }
 
 async function getNextUserId() {
@@ -225,10 +260,15 @@ wss.on('connection', (ws) => {
                         chat.messages.push({ role: 'user', message: data.message });
                         await chat.save();
                     }
-                    
-                    const errorCodeMatch = data.message.match(/(\d{4})/);
-                    if (errorCodeMatch) {
-                        const errorResponse = await errorHandler.getErrorResponse(errorCodeMatch[1]);
+                    isArabicContent(data.message);
+                    console.log(global.isArabic);
+                    const regex1 = /([\d\u0660-\u0669]{4})/;
+                    const regex2 = /(\d{4})/;
+                    const errorCodeMatch1 = data.message.match(regex1);
+                    const errorCodeMatch2 = data.message.match(regex2);
+
+                    if (errorCodeMatch1 || errorCodeMatch2) {
+                        const errorResponse = await errorHandler.getErrorResponse(errorCodeMatch1 ? errorCodeMatch1[1] : errorCodeMatch2[1], global.isArabic);
                         
                         chat.messages.push({ role: 'bot', message: errorResponse });
                         await chat.save();
@@ -269,8 +309,11 @@ wss.on('connection', (ws) => {
                     
                             ws.send(JSON.stringify({
                                 type: 'bot_response',
-                                message: "I'll connect you with a specialist who can answer your queries. Please wait a moment."
+                                message: global.isArabic 
+                                    ? "سأقوم بتوصيلك بمتخصص يمكنه الإجابة على استفساراتك. يرجى الانتظار لحظة."
+                                    : "I'll connect you with a specialist who can answer your queries. Please wait a moment."
                             }));
+                            
                         } else {
                             try {
                                 const response = await chain.call({ input: data.message });
@@ -299,7 +342,9 @@ wss.on('connection', (ws) => {
                     else if (chat.status === 'waiting_for_agent') {
                         ws.send(JSON.stringify({
                             type: 'bot_response',
-                            message: "A OneSingleView specialist will be with you shortly. Thank you for your patience."
+                            message: global.isArabic 
+                                ? "سيكون معك أخصائي OneSingleView قريباً. شكراً لك على صبرك."
+                                : "A OneSingleView specialist will be with you shortly. Thank you for your patience."
                         }));
                     }
                     else if (chat.status === 'active') {
@@ -345,8 +390,69 @@ wss.on('connection', (ws) => {
                 if (targetUserWs) {
                     targetUserWs.send(JSON.stringify({
                         type: 'agent_connected',
-                        message: 'A OneSingleView Agent has joined to assist you.'
+                        message: global.isArabic 
+                            ? "انضم إليك موظف OneSingleView لمساعدتك."
+                            : "A OneSingleView Agent has joined to assist you."
                     }));
+                }
+                break;
+
+
+            case 'pause_chat':
+                try {
+                    const chat = await Chat.findOneAndUpdate(
+                        { userId: data.userId, status: 'active' },
+                        { 
+                            $set: { 
+                                status: 'paused',
+                                agentId: data.agentId
+                            }
+                        }
+                    );
+            
+                    if (chat) {
+                        const userWs = clients.get(data.userId);
+                        if (userWs) {
+                            userWs.send(JSON.stringify({
+                                type: 'chat_paused',
+                                message: 'Your chat has been paused by the agent. You can resume it later.'
+                            }));
+                        }
+            
+                        agents.forEach((agentWs) => {
+                            agentWs.send(JSON.stringify({
+                                type: 'paused_request',
+                                userId: data.userId,
+                                history: chat.messages
+                            }));
+                        });
+                    }
+                } catch (error) {
+                    console.error('Error pausing chat:', error);
+                }
+                break;
+            
+            case 'resume_chat':
+                try {
+                    await Chat.findOneAndUpdate(
+                        { userId: data.userId, status: 'paused' },
+                        { 
+                            $set: { 
+                                status: 'active',
+                                agentId: data.agentId
+                            }
+                        }
+                    );
+            
+                    const userWs = clients.get(data.userId);
+                    if (userWs) {
+                        userWs.send(JSON.stringify({
+                            type: 'agent_unpaused',
+                            message: 'An agent has resumed your chat.'
+                        }));
+                    }
+                } catch (error) {
+                    console.error('Error resuming chat:', error);
                 }
                 break;
 
@@ -437,7 +543,9 @@ wss.on('connection', (ws) => {
                 if (userToEnd) {
                     userToEnd.send(JSON.stringify({
                         type: 'chat_ended',
-                        message: 'Thank you for your interest in OneSingleView. If you have any more questions, feel free to start a new chat.'
+                        message: global.isArabic 
+                            ? "شكراً لاهتمامك بـ OneSingleView. إذا كان لديك المزيد من الأسئلة، لا تتردد في بدء محادثة جديدة."
+                            : "Thank you for your interest in OneSingleView. If you have any more questions, feel free to start a new chat."
                     }));
                 }
 
