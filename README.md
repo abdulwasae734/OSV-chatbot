@@ -71,3 +71,10 @@ cd onesingleview-chat
 ```bash
 npm install
 ```
+# Configure Environment
+## Create a .env file with the following variables:
+```bash
+MONGODB_URI=your_mongodb_connection_string
+OPENAI_API_KEY=your_openai_api_key
+PORT=3000
+```
