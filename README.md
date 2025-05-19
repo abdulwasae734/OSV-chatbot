@@ -105,30 +105,19 @@ node server.js
 
 ### User Flow:
 #### 1. User connects to the chat interface
-
 #### 2. System assigns a unique user ID
-
 #### 3. User sends a message
-
 #### 4. Bot processes and responds to the message
-
 #### 5. If complex, system transitions to "waiting for agent" status
-
 #### 6. Human agent accepts the chat
-
 #### 7. User continues conversation with the agent
 
 ### Agent Flow:
 #### 1. Agent logs into the dashboard
-
 #### 2. System shows pending chat requests
-
 #### 3. Agent accepts a chat request
-
 #### 4. Agent can view chat history
-
 #### 5. Agent communicates with the user
-
 #### 6. Agent can end the chat when resolved
 
 ---
