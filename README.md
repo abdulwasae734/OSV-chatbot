@@ -62,19 +62,34 @@ The system is built with a modular architecture:
 ### Installation Steps
 
 
-# Clone the repository
+### Clone the repository
 ```bash
 git clone https://github.com/yourusername/onesingleview-chat.git
 cd onesingleview-chat
 ```
-# Install dependencies
+### Install dependencies
 ```bash
 npm install
 ```
-# Configure Environment
-## Create a .env file with the following variables:
+### Configure Environment
+#### Create a .env file with the following variables:
 ```bash
 MONGODB_URI=your_mongodb_connection_string
 OPENAI_API_KEY=your_openai_api_key
 PORT=3000
 ```
+### Start the Server
+```bash
+node server.js
+```
+### Access the Application
+- User chat interface: http://localhost:3000
+- Agent dashboard: http://localhost:3000/agent
+
+## 🤖 AI Features:
+
+**Intent Recognition** : Detects when a user needs to speak with a human agent
+**Contextual Responses**: Maintains conversation context for meaningful interactions
+**Error Code Processing**: Provides user-friendly explanations for error codes
+**Multi-language Support**: Handles both English and Arabic queries
+**Spelling Correction**: Fixes minor typos in user messages
