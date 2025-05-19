@@ -71,6 +71,7 @@ cd onesingleview-chat
 ```bash
 npm install
 ```
+---
 ### Configure Environment
 #### Create a .env file with the following variables:
 ```bash
@@ -78,18 +79,56 @@ MONGODB_URI=your_mongodb_connection_string
 OPENAI_API_KEY=your_openai_api_key
 PORT=3000
 ```
+---
+
 ### Start the Server
 ```bash
 node server.js
 ```
+---
+
 ### Access the Application
 - User chat interface: http://localhost:3000
 - Agent dashboard: http://localhost:3000/agent
+---
 
 ## 🤖 AI Features:
 
-**Intent Recognition** : Detects when a user needs to speak with a human agent
-**Contextual Responses**: Maintains conversation context for meaningful interactions
-**Error Code Processing**: Provides user-friendly explanations for error codes
-**Multi-language Support**: Handles both English and Arabic queries
-**Spelling Correction**: Fixes minor typos in user messages
+#### **Intent Recognition** : Detects when a user needs to speak with a human agent
+#### **Contextual Responses**: Maintains conversation context for meaningful interactions
+#### **Error Code Processing**: Provides user-friendly explanations for error codes
+#### **Multi-language Support**: Handles both English and Arabic queries
+#### **Spelling Correction**: Fixes minor typos in user messages
+
+---
+## 🔄 Workflows:
+
+### User Flow:
+#### 1. User connects to the chat interface
+
+#### 2. System assigns a unique user ID
+
+#### 3. User sends a message
+
+#### 4. Bot processes and responds to the message
+
+#### 5. If complex, system transitions to "waiting for agent" status
+
+#### 6. Human agent accepts the chat
+
+#### 7. User continues conversation with the agent
+
+### Agent Flow:
+#### 1. Agent logs into the dashboard
+
+#### 2. System shows pending chat requests
+
+#### 3. Agent accepts a chat request
+
+#### 4. Agent can view chat history
+
+#### 5. Agent communicates with the user
+
+#### 6. Agent can end the chat when resolved
+
+---
