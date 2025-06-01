@@ -2,7 +2,7 @@
 
 A real-time customer support chat system with AI bot integration and human agent handover capabilities for **OneSingleView**, a specialized POS (Point of Sale) data integration solution provider for retail and restaurant businesses.
 
----
+--- 
 
 ## 🌟 Features
 
