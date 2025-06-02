@@ -5,7 +5,6 @@ A real-time customer support chat system with AI bot integration and human agent
 --- 
 
 
-
 ## 🌟 Features
 
 - **Real-time Communication**: WebSocket-based chat system enabling instant messaging  
